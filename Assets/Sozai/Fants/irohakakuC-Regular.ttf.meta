@@ -1,0 +1,24 @@
+fileFormatVersion: 2
+guid: 39400b6422e5642e8ab634311383dc85
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontName: irohakakuC
+  fontNames:
+  - irohakakuC
+  fallbackFontReferences:
+  - {fileID: 12800000, guid: a82fa13069fbd4bcf89fd8ebbe399324, type: 3}
+  - {fileID: 12800000, guid: 05e72668266d44571a8560e197139167, type: 3}
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  shouldRoundAdvanceValue: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

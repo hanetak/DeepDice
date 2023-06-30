@@ -1,9 +1,15 @@
-﻿
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+
+public enum MapCellType
+{
+    Battle,
+    Rest,
+    Event
+}
 
 public class GameManager : MonoBehaviour
 {
@@ -13,7 +19,6 @@ public class GameManager : MonoBehaviour
     [SerializeField] AudioClip _nextAudio;
     [SerializeField] AudioClip _resetAudio;
     [SerializeField] AudioClip _timeUpAudio;
-
 
     [SerializeField] GameObject _textMondai;
     [SerializeField] GameObject[] _textNumbers;
@@ -25,634 +30,148 @@ public class GameManager : MonoBehaviour
     [SerializeField] float _faceTimer;
 
     [SerializeField] float _lockTimer;
-    float _lockTime;
 
-    float _solveTime;
+    private int _DiceNum;
+    private int _MoveNum;
+    public GameObject _textDice;
+    public GameObject _textMove;
+    public GameObject _camera;
+    private Vector3 lastMoveDirection;
 
-    private int _mainNum;
-    private int _bfNum;
-    private int[] _nums;
-    private int _score;
-    private int _stage;
+    public int width = 10;
+    public int height = 10;
+    private MapCellType[,] map;
 
-    public int _solveNum;
+    public GameObject battleCellPrefab;
+    public GameObject restCellPrefab;
+    public GameObject eventCellPrefab;
 
-    private bool _isActive;
+    public float moveDistance = 4.0f; // カメラの移動距離
+
     // Start is called before the first frame update
     void Start()
     {
-        _faceTimer = 10f;
-        audioSource = GetComponent<AudioSource>();
-        audioSource.volume = Grobal.SE;
-
-        playMeido = _PlayMeido.GetComponent<PlayMeido>();
-
-        _stage = 1;
-        BoxTextView(1);
-        StartCoroutine("FirstQuestion");
+        map = new MapCellType[width, height];
+        GenerateMap();
+        _MoveNum = -1;
+        _DiceNum = 0;
     }
 
     // Update is called once per frame
     void Update()
     {
-        _lockTime -= Time.deltaTime;
-        if (_lockTime < 0)
-        {
-            _isActive = true;
-        }
+        _textDice.GetComponent<Text>().text = _DiceNum.ToString();
+        _textMove.GetComponent<Text>().text = _MoveNum.ToString();
 
-        _solveTime += Time.deltaTime;
-        if (_solveTime > _faceTimer)
+        if (_MoveNum > 0)
         {
-            _faceTimer = 9999;
-            playMeido.MeidoAction(3, _stage);
-        }
-    }
-
-    public void OnClickNum0()
-    {
-        if (_isActive)
-        {
-            Culclate(0);
-            Check();
-        }
-    }
-
-    public void OnClickNum1()
-    {
-        if (_isActive)
-        {
-            Culclate(1);
-            Check();
-        }
-    }
-
-    public void OnClickNum2()
-    {
-        if (_isActive)
-        {
-            Culclate(2);
-            Check();
-        }
-    }
-
-    public void OnClickNum3()
-    {
-        if (_isActive)
-        {
-            Culclate(3);
-            Check();
-        }
-    }
-
-    void Culclate(int i)
-    {
-        audioSource.PlayOneShot(_pushAudio);
-        string tmp = _textNumbers[i].GetComponent<Text>().text[0].ToString();
-        string index = _textNumbers[i].GetComponent<Text>().text.Remove(0, 1);
-        if (tmp == "+")
-        {
-            _mainNum += int.Parse(index);
-            _textMondai.GetComponent<Text>().text = _mainNum.ToString();
-        }
-        if (tmp == "-")
-        {
-            _mainNum -= int.Parse(index);
-            _textMondai.GetComponent<Text>().text = _mainNum.ToString();
-        }
-        if (tmp == "×")
-        {
-            _mainNum *= int.Parse(index);
-            _textMondai.GetComponent<Text>().text = _mainNum.ToString();
-        }
-        if (tmp == "÷")
-        {
-            _mainNum /= int.Parse(index);
-            _textMondai.GetComponent<Text>().text = _mainNum.ToString();
-        }
-    }
-
-    //ゾロ目かチェック
-    void Check()
-    {
-        _isActive = false;
-        _lockTime = _lockTimer;
-        bool _isZorome = true;
-        int loop = _mainNum.ToString().Length;
-        int check = _mainNum;
-        int bf = check % 10;
-        check /= 10;
-        for (int i = 0; i < loop - 1; i++)
-        {
-            int af = check % 10;
-            check /= 10;
-            if (af != bf)
+            // 上矢印キーが押されたら
+            if (Input.GetKeyDown(KeyCode.UpArrow) && lastMoveDirection != Vector3.down)
             {
-                _isZorome = false;
+                // カメラの位置を上に移動する
+                _camera.transform.position += Vector3.up * moveDistance;
+                _MoveNum -= 1;
+                lastMoveDirection = Vector3.up;
             }
-            bf = af;
-        }
 
-        if (_mainNum < 0 || _mainNum > 99999)
-        {
-            _isActive = false;
-            BoxTextView(4);
-        }
-
-        //ゾロ目の場合次の問題へ-------------------------------------------------------------------
-        if (_isZorome && loop != 1 || _mainNum == 1)
-        {
-
-            _solveNum++;
-            audioSource.PlayOneShot(_nextAudio);
-            if (_mainNum == 1)
+            // 下矢印キーが押されたら
+            if (Input.GetKeyDown(KeyCode.DownArrow) && lastMoveDirection != Vector3.up)
             {
-                _score += _stage * _stage * 1000;
+                // カメラの位置を下に移動する
+                _camera.transform.position += Vector3.down * moveDistance;
+                _MoveNum -= 1;
+                lastMoveDirection = Vector3.down;
             }
-            else
+
+            // 左矢印キーが押されたら
+            if (Input.GetKeyDown(KeyCode.LeftArrow) && lastMoveDirection != Vector3.right)
             {
-                if (_stage == 1)
+                // カメラの位置を左に移動する
+                _camera.transform.position += Vector3.left * moveDistance;
+                _MoveNum -= 1;
+                lastMoveDirection = Vector3.left;
+            }
+
+            // 右矢印キーが押されたら
+            if (Input.GetKeyDown(KeyCode.RightArrow) && lastMoveDirection != Vector3.left)
+            {
+                // カメラの位置を右に移動する
+                _camera.transform.position += Vector3.right * moveDistance;
+                _MoveNum -= 1;
+                lastMoveDirection = Vector3.right;
+            }
+        }
+        // プレイヤーがマスに止まったとき
+        if (_MoveNum == 0)
+        {
+            // プレイヤーが止まったマスの座標を計算
+            int x = (int)(_camera.transform.position.x / moveDistance) + width / 2;
+            int y = (int)(_camera.transform.position.y / moveDistance) + height / 2;
+
+            // マスの種類に基づいてイベント画面を表示
+            switch (map[x, y])
+            {
+                case MapCellType.Battle:
+                    // 戦闘イベント画面を表示
+                    _MoveNum = -1;
+                    break;
+                case MapCellType.Rest:
+                    // 休憩イベント画面を表示
+                    _MoveNum = -1;
+                    break;
+                case MapCellType.Event:
+                    // イベント画面を表示
+                    _MoveNum = -1;
+                    break;
+            }
+        }
+    }
+
+    public int RollDice()
+    {
+        int num = Random.Range(1, 7);
+        return num;
+    }
+
+    public void OnClickDice()
+    {
+        _DiceNum = RollDice();
+        _MoveNum = _DiceNum;
+    }
+
+    void GenerateMap()
+    {
+        for(int x = 0; x < width; x++)
+        {
+            for(int y = 0; y < height; y++)
+            {
+                GameObject cellPrefab;
+
+                // ランダムな値に基づいてセルのタイプを設定します
+                int randomValue = Random.Range(0, 3);
+                if(randomValue == 0)
                 {
-                    _score += Mathf.Max(loop - 1, 1) * Mathf.Max(loop - 1, 1) * 100;
+                    map[x, y] = MapCellType.Battle;
+                    cellPrefab = battleCellPrefab;
                 }
-                else if (_stage == 2)
+                else if(randomValue == 1)
                 {
-                    _score += Mathf.Max(loop - 2, 1) * Mathf.Max(loop - 2, 1) * 1000;
-                }
-                else if (_stage == 3)
-                {
-                    _score += Mathf.Max(loop - 3, 1) * 5000;
-                }
-            }
-            _textScore.GetComponent<Text>().text = _score.ToString();
-            BoxTextView(loop - 1 + 10);//箱の表示文字
-            if (_mainNum == 1)
-            {
-                BoxTextView(1001);
-            }
-            else if (_solveNum % 10 == 1 && _solveNum != 1)
-            {
-                BoxTextView(101);
-            }
-
-
-            if (_solveNum <= 10)
-            {
-                if (_mainNum == 1)
-                {
-                    playMeido.MeidoAction(1, _stage);
+                    map[x, y] = MapCellType.Rest;
+                    cellPrefab = restCellPrefab;
                 }
                 else
                 {
-                    if (_solveTime < 1)
-                    {
-                        playMeido.MeidoAction(2, _stage);
-                    }
-                    else if (_solveTime < 3 && _solveTime >= 1)
-                    {
-                        playMeido.MeidoAction(4, _stage);
-                    }
-                    else
-                    {
-                        playMeido.MeidoAction(0, _stage);
-                    }
+                    map[x, y] = MapCellType.Event;
+                    cellPrefab = eventCellPrefab;
                 }
 
-                StartCoroutine("keta2Question");
-                _faceTimer = 10;
+                // プレハブをインスタンス化します
+                int pointX = x -  width/2;
+                int pointY = y -  height/2;
+                pointX =  pointX * 4;
+                pointY = pointY * 4;
+                Instantiate(cellPrefab, new Vector3(pointX,  pointY, 0), Quaternion.identity);
             }
-            else if (_solveNum <= 20 && _solveNum > 10)
-            {
-                if (_mainNum == 1)
-                {
-                    playMeido.MeidoAction(1, _stage);
-                }
-                else
-                {
-                    if (_solveTime < 5)
-                    {
-                        playMeido.MeidoAction(2, _stage);
-                    }
-                    else if (_solveTime < 10 && _solveTime >= 5)
-                    {
-                        playMeido.MeidoAction(4, _stage);
-                    }
-                    else
-                    {
-                        playMeido.MeidoAction(0, _stage);
-                    }
-                }
-                _stage = 2;
-
-                StartCoroutine("keta3Question");
-                _faceTimer = 20;
-            }
-            else
-            {
-                if (_mainNum == 1)
-                {
-                    playMeido.MeidoAction(1, _stage);
-                }
-                else
-                {
-                    if (_solveTime < 8)
-                    {
-                        playMeido.MeidoAction(2, _stage);
-                    }
-                    else if (_solveTime < 16 && _solveTime >= 8)
-                    {
-                        playMeido.MeidoAction(4, _stage);
-                    }
-                    else
-                    {
-                        playMeido.MeidoAction(0, _stage);
-                    }
-                }
-                _stage = 3;
-                StartCoroutine("keta4Question");
-                _faceTimer = 30;
-            }
-            _lockTime = 0.5f;
-            _solveTime = 0;
-        }
-
-    }
-
-    public void OnClickReset()
-    {
-        if (_isActive)
-        {
-            audioSource.PlayOneShot(_resetAudio);
-            BoxTextView(2);
-            StartCoroutine("ResetNum");
-        }
-    }
-
-    IEnumerator ResetNum()
-    {
-        yield return new WaitForSeconds(0.2f);
-
-        List<int> numbers = new List<int>();
-        int numbermax = 10 * _stage;
-        List<int> ransus = new List<int>();
-
-        for (int i = 1; i <= numbermax; i++)
-        {
-            numbers.Add(i);
-        }
-
-        int count = 4;
-        while (count-- > 0)
-        {
-
-            int index = Random.Range(0, numbers.Count);
-            int ransu = numbers[index];
-            numbers.RemoveAt(index);
-            ransus.Add(ransu);
-        }
-
-        for (int i = 0; i < 4; i++)
-        {
-            if (i < 2)
-            {
-                _textNumbers[i].GetComponent<Text>().text = "+" + ransus[i].ToString();
-            }
-            else
-            {
-                _textNumbers[i].GetComponent<Text>().text = "-" + ransus[i].ToString();
-            }
-            /*
-            if(tmp == 5)
-            {
-                int index = Random.Range(2,5);
-                _textNumbers[i].GetComponent<Text>().text = "×" + index.ToString();
-            }
-            if(tmp == 6)
-            {
-                int index = Random.Range(2,5);
-                _textNumbers[i].GetComponent<Text>().text = "÷" + index.ToString();
-            }*/
-        }
-        _mainNum = _bfNum;
-        _textMondai.GetComponent<Text>().text = _mainNum.ToString();
-        _isActive = true;
-    }
-
-    IEnumerator FirstQuestion()
-    {
-        _isActive = false;
-        yield return new WaitForSeconds(1.0f);
-        _mainNum = Random.Range(11, 91);
-        if (_mainNum / 10 == _mainNum % 10)
-        {
-            _mainNum += Random.Range(1, 10);
-        }
-        _bfNum = _mainNum;
-        _textMondai.GetComponent<Text>().text = _mainNum.ToString();
-
-        //かぶらない
-        List<int> numbers = new List<int>();
-        List<int> ransus = new List<int>();
-
-        for (int i = 1; i <= 10; i++)
-        {
-            numbers.Add(i);
-        }
-
-        int count = 4;
-        while (count-- > 0)
-        {
-
-            int index = Random.Range(0, numbers.Count);
-            int ransu = numbers[index];
-            numbers.RemoveAt(index);
-            ransus.Add(ransu);
-        }
-
-        for (int i = 0; i < 4; i++)
-        {
-            if (i < 2)
-            {
-                _textNumbers[i].GetComponent<Text>().text = "+" + ransus[i].ToString();
-            }
-            else
-            {
-                _textNumbers[i].GetComponent<Text>().text = "-" + ransus[i].ToString();
-            }
-            /*
-            if(tmp == 5)
-            {
-                int index = Random.Range(2,5);
-                _textNumbers[i].GetComponent<Text>().text = "×" + index.ToString();
-            }
-            if(tmp == 6)
-            {
-                int index = Random.Range(2,5);
-                _textNumbers[i].GetComponent<Text>().text = "÷" + index.ToString();
-            }*/
-            _isActive = true;
-        }
-    }
-
-    void NextQuestion()
-    {
-
-    }
-
-    void BoxTextView(int state)
-    {
-        if (state == 1)
-        {
-            _textMondai.GetComponent<Text>().text = "START";
-        }
-        if (state == 2)
-        {
-            _textMondai.GetComponent<Text>().text = "RESET";
-        }
-        if (state == 3)
-        {
-            _textMondai.GetComponent<Text>().text = "FIN";
-        }
-        if (state == 4)
-        {
-            _textMondai.GetComponent<Text>().text = "ERROR";
-        }
-        if (state == 11)
-        {
-            _textMondai.GetComponent<Text>().text = "GOOD";
-        }
-        if (state == 12)
-        {
-            _textMondai.GetComponent<Text>().text = "NICE";
-        }
-        if (state == 13)
-        {
-            _textMondai.GetComponent<Text>().text = "WOW!";
-        }
-        if (state == 14)
-        {
-            _textMondai.GetComponent<Text>().text = "OMG!";
-        }
-        if (state == 101)
-        {
-            _textMondai.GetComponent<Text>().text = "LvUP";
-        }
-        if (state == 1001)
-        {
-            _textMondai.GetComponent<Text>().text = "Solo1";
-        }
-
-    }
-
-    public void GameOver()
-    {
-        _lockTime = 3.0f;
-        _isActive = false;
-        audioSource.PlayOneShot(_timeUpAudio);
-        Grobal.SetScore(_score);
-        Grobal.SetSolve(_solveNum);
-        BoxTextView(3);
-        StartCoroutine("GoResult");
-    }
-
-    IEnumerator GoResult()
-    {
-        yield return new WaitForSeconds(1.0f);
-        SceneManager.LoadScene("Result");
-    }
-
-    IEnumerator keta2Question()
-    {
-        _isActive = false;
-        yield return new WaitForSeconds(0.3f);
-        _mainNum = Random.Range(11, 91);
-        if (_mainNum / 10 == _mainNum % 10)
-        {
-            _mainNum += Random.Range(1, 10);
-        }
-        _bfNum = _mainNum;
-        _textMondai.GetComponent<Text>().text = _mainNum.ToString();
-
-        //かぶらない
-        List<int> numbers = new List<int>();
-        List<int> ransus = new List<int>();
-        for (int i = 1; i <= 10; i++)
-        {
-            numbers.Add(i);
-        }
-
-        int count = 4;
-        while (count-- > 0)
-        {
-
-            int index = Random.Range(0, numbers.Count);
-            int ransu = numbers[index];
-            numbers.RemoveAt(index);
-            ransus.Add(ransu);
-        }
-
-        for (int i = 0; i < 4; i++)
-        {
-            if (i < 2)
-            {
-                _textNumbers[i].GetComponent<Text>().text = "+" + ransus[i].ToString();
-            }
-            else
-            {
-                _textNumbers[i].GetComponent<Text>().text = "-" + ransus[i].ToString();
-            }
-            /*
-            if(tmp == 5)
-            {
-                int index = Random.Range(2,5);
-                _textNumbers[i].GetComponent<Text>().text = "×" + index.ToString();
-            }
-            if(tmp == 6)
-            {
-                int index = Random.Range(2,5);
-                _textNumbers[i].GetComponent<Text>().text = "÷" + index.ToString();
-            }*/
-            _isActive = true;
-        }
-    }
-
-    IEnumerator keta3Question()
-    {
-        _isActive = false;
-        yield return new WaitForSeconds(0.3f);
-        _mainNum = Random.Range(101, 990);
-        bool _isZorome = true;
-        int loop = _mainNum.ToString().Length;
-        int check = _mainNum;
-        int bf = check % 10;
-        check /= 10;
-        for (int i = 0; i < loop - 1; i++)
-        {
-            int af = check % 10;
-            check /= 10;
-            if (af != bf)
-            {
-                _isZorome = false;
-            }
-            bf = af;
-        }
-        //ゾロ目の場合次の問題へ
-        if (_isZorome && loop != 1)
-        {
-            _mainNum += Random.Range(1, 10);
-        }
-        _bfNum = _mainNum;
-        _textMondai.GetComponent<Text>().text = _mainNum.ToString();
-
-        //かぶらない
-        List<int> numbers = new List<int>();
-        List<int> ransus = new List<int>();
-        for (int i = 1; i <= 20; i++)
-        {
-            numbers.Add(i);
-        }
-
-        int count = 4;
-        while (count-- > 0)
-        {
-            int index = Random.Range(0, numbers.Count);
-            int ransu = numbers[index];
-            numbers.RemoveAt(index);
-            ransus.Add(ransu);
-        }
-
-        for (int j = 0; j < 4; j++)
-        {
-            if (j < 2)
-            {
-                _textNumbers[j].GetComponent<Text>().text = "+" + ransus[j].ToString();
-            }
-            else
-            {
-                _textNumbers[j].GetComponent<Text>().text = "-" + ransus[j].ToString();
-            }
-            /*
-            if(tmp == 5)
-            {
-                int index = Random.Range(2,5);
-                _textNumbers[i].GetComponent<Text>().text = "×" + index.ToString();
-            }
-            if(tmp == 6)
-            {
-                int index = Random.Range(2,5);
-                _textNumbers[i].GetComponent<Text>().text = "÷" + index.ToString();
-            }*/
-            _isActive = true;
-        }
-    }
-
-    IEnumerator keta4Question()
-    {
-        _isActive = false;
-        yield return new WaitForSeconds(0.3f);
-        _mainNum = Random.Range(1001, 9990);
-        bool _isZorome = true;
-        int loop = _mainNum.ToString().Length;
-        int check = _mainNum;
-        int bf = check % 10;
-        check /= 10;
-        for (int i = 0; i < loop - 1; i++)
-        {
-            int af = check % 10;
-            check /= 10;
-            if (af != bf)
-            {
-                _isZorome = false;
-            }
-            bf = af;
-        }
-        //ゾロ目の場合次の問題へ
-        if (_isZorome && loop != 1)
-        {
-            _mainNum += Random.Range(1, 10);
-        }
-        _bfNum = _mainNum;
-        _textMondai.GetComponent<Text>().text = _mainNum.ToString();
-
-        //かぶらない
-        List<int> numbers = new List<int>();
-        List<int> ransus = new List<int>();
-        for (int i = 1; i <= 30; i++)
-        {
-            numbers.Add(i);
-        }
-
-        int count = 4;
-        while (count-- > 0)
-        {
-            int index = Random.Range(0, numbers.Count);
-            int ransu = numbers[index];
-            numbers.RemoveAt(index);
-            ransus.Add(ransu);
-        }
-
-        for (int j = 0; j < 4; j++)
-        {
-            if (j < 2)
-            {
-                _textNumbers[j].GetComponent<Text>().text = "+" + ransus[j].ToString();
-            }
-            else
-            {
-                _textNumbers[j].GetComponent<Text>().text = "-" + ransus[j].ToString();
-            }
-            /*
-            if(tmp == 5)
-            {
-                int index = Random.Range(2,5);
-                _textNumbers[i].GetComponent<Text>().text = "×" + index.ToString();
-            }
-            if(tmp == 6)
-            {
-                int index = Random.Range(2,5);
-                _textNumbers[i].GetComponent<Text>().text = "÷" + index.ToString();
-            }*/
-            _isActive = true;
         }
     }
 }

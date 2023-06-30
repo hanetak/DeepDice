@@ -42,7 +42,6 @@ public class TimeCounter : MonoBehaviour
             if (countdownSeconds <= 0)
             {
                 countdownSeconds = 0;
-                gameManager.GameOver();
                 _isActive = false;
                 // 0秒になったときの処理
             }
